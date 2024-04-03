@@ -80,6 +80,7 @@ app.MapDelete("/products/{id}", ([FromRoute] int id, ApplicationDbContext contex
 {
     var product = context.Products.Where(p => p.Id == id).First();
     context.Products.Remove(product);
+    context.SaveChanges();
     return Results.Ok(product);
 });
 
