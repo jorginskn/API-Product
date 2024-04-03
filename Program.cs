@@ -51,19 +51,36 @@ app.MapPost("/products", (ProductRequest productRequest, ApplicationDbContext co
     return Results.Created($"/products/{product.Id}", product.Id);
 });
 
-app.MapPut("/product", (Product product) =>
+app.MapPut("/products/{id}", ([FromRoute] int id, ProductRequest productRequest, ApplicationDbContext context) =>
 {
-    var productSaved = productRepository.GetByCode(product.Code);
-    productSaved.Name = product.Name;
-    productSaved.Code = product.Code;
-    Results.Ok();
+    var product = context.Products
+   .Include(p => p.Category)
+   .Include(p => p.Tags)
+   .Where(p => p.Id == id).First();
+    var category = context.Category.Where(c => c.Id == productRequest.CategoryId).First();
+
+    product.Code = productRequest.Code;
+    product.Name = productRequest.Name;
+    product.Description = productRequest.Description;
+    product.Category = category;
+    product.Tags = new List<Tag>();
+    if (productRequest.Tags != null)
+    {
+        product.Tags = new List<Tag>();
+        foreach (var item in productRequest.Tags)
+        {
+            product.Tags.Add(new Tag { Name = item });
+        }
+    }
+    context.SaveChanges();
+    return Results.Ok();
 });
 
-app.MapDelete("/products/{code}", ([FromRoute] string code) =>
+app.MapDelete("/products/{id}", ([FromRoute] int id, ApplicationDbContext context) =>
 {
-    var productSaved = productRepository.GetByCode(code);
-    productRepository.Remove(productSaved);
-    return Results.Ok(productSaved);
+    var product = context.Products.Where(p => p.Id == id).First();
+    context.Products.Remove(product);
+    return Results.Ok(product);
 });
 
 app.MapGet("/configuration/database", (IConfiguration configuration) =>
