@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using System.Linq;
 using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSqlServer<ApplicationDbContext>(builder.Configuration["Database:SqlServer"]);
@@ -11,9 +12,12 @@ var configuration = app.Configuration;
 var productRepository = new ProductRepository();
 productRepository.Init(configuration);
 
-app.MapGet("/products/{code}", ([FromRoute] string code) =>
+app.MapGet("/products/{id}", ([FromRoute] int id, ApplicationDbContext context) =>
 {
-    var product = productRepository.GetByCode(code);
+    var product = context.Products
+    .Include(p => p.Category)
+    .Include(p => p.Tags)
+    .Where(p => p.Id == id).First();
     if (product != null)
     {
         return Results.Ok(product);
@@ -34,9 +38,17 @@ app.MapPost("/products", (ProductRequest productRequest, ApplicationDbContext co
         Description = productRequest.Description,
         Category = category
     };
-        context.Products.Add(product);
-        context.SaveChanges();
-     return Results.Created($"/products/{product.Id}", product.Id);
+    if (productRequest.Tags != null)
+    {
+        product.Tags = new List<Tag>();
+        foreach (var item in productRequest.Tags)
+        {
+            product.Tags.Add(new Tag { Name = item });
+        }
+    }
+    context.Products.Add(product);
+    context.SaveChanges();
+    return Results.Created($"/products/{product.Id}", product.Id);
 });
 
 app.MapPut("/product", (Product product) =>
